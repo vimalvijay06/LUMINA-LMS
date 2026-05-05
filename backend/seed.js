@@ -59,9 +59,9 @@ const seedDB = async () => {
         console.log('Connected to PostgreSQL. Rebuilding schema with Raw SQL...');
 
         // 1. Schema check
-        console.log('Ensuring tables exist...');
-
-        // 2. Create tables
+        console.log('--- STARTING DATABASE INITIALIZATION ---');
+        
+        // Ensure users table exists
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id VARCHAR(50) PRIMARY KEY,
@@ -77,6 +77,8 @@ const seedDB = async () => {
                 fines_owed FLOAT DEFAULT 0,
                 joined_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+        `);
+        console.log('✅ Users table ensured.');
  
             CREATE TABLE IF NOT EXISTS books (
                 id VARCHAR(50) PRIMARY KEY,
