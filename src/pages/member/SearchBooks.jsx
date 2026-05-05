@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../utils/mockData';
-import { getCurrentUser } from '../../utils/auth';
+import { getCurrentUser, secureFetch } from '../../utils/auth';
 import { Search, MapPin, Map, BookOpen, Clock, AlertCircle, Filter, ArrowUpDown, X } from 'lucide-react';
 
 const SearchBooks = () => {
@@ -9,24 +8,39 @@ const SearchBooks = () => {
     const [filterStatus, setFilterStatus] = useState('ALL');
     const [searchField, setSearchField] = useState('TITLE');
     const [sortBy, setSortBy] = useState('RECENT');
-    const [refreshTick, setRefreshTick] = useState(0); // increment to force re-fetch
+    const [refreshTick, setRefreshTick] = useState(0); 
 
     const [books, setBooks] = useState([]);
-    const [user] = useState(getCurrentUser());
+    const [allBooksFromAPI, setAllBooksFromAPI] = useState([]); 
+    const [user] = useState(getCurrentUser() || { id: '' });
     const [selectedBookForMap, setSelectedBookForMap] = useState(null);
+    const [rackPhotos, setRackPhotos] = useState({});
 
-    // Refresh Data
+    // Fetch from API
     useEffect(() => {
-        // Always read fresh from db.books (getter returns live array)
-        // Deduplicate by id as a safety net
-        const seen = new Set();
-        const allBooks = db.books.filter(b => {
-            if (seen.has(b.id)) return false;
-            seen.add(b.id);
-            return true;
-        });
+        const fetchBooks = async () => {
+            try {
+                const res = await secureFetch(`${import.meta.env.VITE_API_URL}/books`);
+                const data = await res.json();
+                setAllBooksFromAPI(data);
+            } catch (err) {
+                console.error("Fetch Error:", err);
+            }
+        };
+        const fetchRackPhotos = async () => {
+            try {
+                const res = await secureFetch(`${import.meta.env.VITE_API_URL}/racks`);
+                const data = await res.json();
+                setRackPhotos(data);
+            } catch (err) { console.error(err); }
+        };
+        fetchBooks();
+        fetchRackPhotos();
+    }, [refreshTick]);
 
-        let result = [...allBooks];
+    // Filter & Sort Logic
+    useEffect(() => {
+        let result = [...allBooksFromAPI];
 
         // 1. Search Filter
         if (searchTerm) {
@@ -57,15 +71,27 @@ const SearchBooks = () => {
         });
 
         setBooks(result);
-    }, [searchTerm, filterStatus, searchField, sortBy, user.id, refreshTick]);
+    }, [searchTerm, filterStatus, searchField, sortBy, user.id, allBooksFromAPI]);
 
-    const handleAction = (type, bookId) => {
+    const handleAction = async (type, bookId) => {
         if (type === 'reserve') {
-            const res = db.reserveBook(bookId, user.id);
-            if (res.message) alert(res.message);
+            try {
+                const res = await secureFetch(`${import.meta.env.VITE_API_URL}/books/${bookId}/reserve`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: user.id })
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    alert(result.message);
+                    setRefreshTick(prev => prev + 1); // Trigger fetchBooks re-run
+                } else {
+                    alert(result.message);
+                }
+            } catch (err) {
+                alert("Server Error: Action failed.");
+            }
         }
-        // Increment tick → triggers useEffect to re-read db.books (no page reload)
-        setRefreshTick(t => t + 1);
     };
 
     return (
@@ -218,71 +244,96 @@ const SearchBooks = () => {
                     <p className="text-gray-500">Try adjusting your search or filters.</p>
                 </div>
             )}
-
-            {/* Map Modal */}
+            {/* Rack Location Modal */}
             {selectedBookForMap && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-4xl h-[600px] flex flex-col shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-200">
-
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
                         {/* Header */}
-                        <div className="p-6 border-b flex justify-between items-center bg-gray-50 z-10">
-                            <div>
-                                <h2 className="text-xl font-bold flex items-center gap-2">
-                                    <Map className="text-indigo-600" />
-                                    Locate "{selectedBookForMap.title}"
-                                </h2>
-                                <p className="text-sm text-gray-500 ml-8">
-                                    Rack: <span className="font-bold text-gray-800">{selectedBookForMap.location.rack}</span> •
-                                    Shelf: {selectedBookForMap.location.shelf} •
-                                    Section: {selectedBookForMap.location.section}
-                                </p>
+                        <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-white z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                                    <MapPin size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">Rack Location Guide</h2>
+                                    <p className="text-sm text-gray-500">
+                                        Find <span className="text-gray-900 font-bold">{selectedBookForMap.title}</span> at Rack <span className="text-indigo-600 font-extrabold">{selectedBookForMap.location.rack}</span>
+                                    </p>
+                                </div>
                             </div>
-                            <button onClick={() => setSelectedBookForMap(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X /></button>
+                            <button 
+                                onClick={() => setSelectedBookForMap(null)} 
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+                            >
+                                <X size={24} />
+                            </button>
                         </div>
 
-                        {/* Map Canvas - Read Only Mode */}
-                        <div className="flex-1 relative bg-gray-100 overflow-auto cursor-grab active:cursor-grabbing">
-                            <div className="absolute top-0 left-0 w-[3000px] h-[3000px] origin-top-left"
-                                style={{
-                                    backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
-                                    backgroundSize: '20px 20px'
-                                }}>
-                                {db.layout.map(item => {
-                                    const isTarget = item.label === selectedBookForMap.location.rack && item.type === 'rack';
-
-                                    return (
-                                        <div
-                                            key={item.id}
-                                            style={{
-                                                position: 'absolute',
-                                                left: item.x, top: item.y,
-                                                width: item.width, height: item.height,
-                                                transform: `rotate(${item.rotation}deg)`,
-                                                zIndex: isTarget ? 50 : 1
+                        {/* Rack Image Component with Shelf Pin */}
+                        <div className="relative aspect-video bg-gray-50 p-8">
+                            {rackPhotos[selectedBookForMap.location.rack] ? (
+                                <div className="h-full w-full rounded-2xl overflow-hidden shadow-2xl border-4 border-white relative group">
+                                    <img 
+                                        src={rackPhotos[selectedBookForMap.location.rack].url} 
+                                        className="w-full h-full object-cover"
+                                        alt={`Rack ${selectedBookForMap.location.rack}`}
+                                    />
+                                    
+                                    {/* PRIORITIZE BOOK-SPECIFIC PIN */}
+                                    {(selectedBookForMap.location?.position?.x !== null || 
+                                      (rackPhotos[selectedBookForMap.location.rack].pins && 
+                                       rackPhotos[selectedBookForMap.location.rack].pins[selectedBookForMap.location.shelf])) && (
+                                        <div 
+                                            className="absolute -translate-x-1/2 -translate-y-1/2 z-20"
+                                            style={{ 
+                                                left: `${selectedBookForMap.location?.position?.x ?? rackPhotos[selectedBookForMap.location.rack].pins[selectedBookForMap.location.shelf].x}%`, 
+                                                top: `${selectedBookForMap.location?.position?.y ?? rackPhotos[selectedBookForMap.location.rack].pins[selectedBookForMap.location.shelf].y}%` 
                                             }}
-                                            className={`
-                                                flex items-center justify-center font-bold text-xs select-none transition-all duration-500 border
-                                                ${item.type === 'rack' ? 'bg-white shadow-sm' : ''}
-                                                ${item.type === 'wall' ? 'bg-gray-700 border-gray-700' : ''}
-                                                ${item.type === 'entrance' ? 'bg-red-50 border-dashed border-red-300' : ''}
-                                                ${item.type === 'desk' ? 'bg-emerald-500 opacity-50 border-emerald-600' : ''}
-                                                ${isTarget ? 'ring-4 ring-indigo-500 shadow-2xl scale-110 !bg-indigo-50 !text-indigo-700 !border-indigo-200 z-50' : 'text-gray-400 border-gray-300'}
-                                            `}
                                         >
-                                            {item.type !== 'wall' && item.label}
-                                            {isTarget && (
-                                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-3 py-1 rounded-full whitespace-nowrap text-sm shadow-lg animate-bounce">
-                                                    You are here
+                                            <div className="relative">
+                                                {/* Pulsing Aura */}
+                                                <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-75"></div>
+                                                {/* Main Pin */}
+                                                <div className="relative bg-indigo-600 text-white w-12 h-12 rounded-full flex flex-col items-center justify-center border-4 border-white shadow-[0_0_30px_rgba(79,70,229,0.5)] transform scale-110">
+                                                    <span className="text-xs font-black leading-none">{selectedBookForMap.location.shelf}</span>
+                                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-1"></div>
                                                 </div>
-                                            )}
+                                                {/* Tooltip */}
+                                                <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-gray-900 border border-white/20 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg whitespace-nowrap shadow-2xl">
+                                                    {selectedBookForMap.location?.position?.x ? 'EXACT LOCATION' : 'SHELF AREA'}
+                                                </div>
+                                            </div>
                                         </div>
-                                    )
-                                })}
-                            </div>
+                                    )}
+
+                                    <div className="absolute top-8 left-8">
+                                        <div className="bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-xl text-lg font-black border border-white/20">
+                                            Rack {selectedBookForMap.location.rack}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="h-full w-full rounded-2xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-4">
+                                    <Camera size={48} className="opacity-20" />
+                                    <p className="text-sm font-medium italic">No photo added for this rack yet.</p>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="p-4 bg-white border-t text-center text-sm text-gray-500">
-                            Scroll to Zoom • Drag to Move
+                        {/* Details Footer */}
+                        <div className="p-8 bg-gray-50 flex flex-col gap-4">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-gray-500 flex items-center gap-2">
+                                    <AlertCircle size={16} /> Look for this physical rack in the library.
+                                </span>
+                                <span className="font-bold text-gray-800">Shelf {selectedBookForMap.location.shelf} • {selectedBookForMap.location.section}</span>
+                            </div>
+                            <button 
+                                onClick={() => setSelectedBookForMap(null)}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 transition-all active:scale-95"
+                            >
+                                Got it, thanks!
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Loader2, Library, ShieldCheck, User } from 'lucide-react';
-import { db } from '../utils/mockData';
 import { loginUser } from '../utils/auth';
 
 const Login = () => {
@@ -21,14 +20,20 @@ const Login = () => {
         if (predefinedRole === 'MEMBER') setEmail('vimal@example.com');
     }, [predefinedRole]);
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
 
-        // Simulate network delay
-        setTimeout(() => {
-            const result = db.login(email, password);
+        // Fetch against MongoDB Backend
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const result = await res.json();
 
             if (result.success) {
                 // Security Check: If user came from a specific portal link, ensure role matches
@@ -38,14 +43,17 @@ const Login = () => {
                     return;
                 }
 
-                loginUser(result.user);
+                loginUser(result.user, result.token);
                 const from = location.state?.from?.pathname || (result.user.role === 'ADMIN' ? '/admin/dashboard' : '/member/dashboard');
                 navigate(from, { replace: true });
             } else {
                 setError(result.message);
                 setLoading(false);
             }
-        }, 800);
+        } catch (err) {
+            setError('Server Error: Connection failed.');
+            setLoading(false);
+        }
     };
 
 
@@ -94,6 +102,7 @@ const Login = () => {
                                 required
                                 className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none bg-gray-50 focus:bg-white"
                                 placeholder="name@example.com"
+                                autoComplete="username"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
@@ -106,6 +115,7 @@ const Login = () => {
                                 required
                                 className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none bg-gray-50 focus:bg-white"
                                 placeholder="••••••••"
+                                autoComplete="current-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
@@ -122,12 +132,6 @@ const Login = () => {
                             {loading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Sign In'}
                         </button>
 
-                        {!predefinedRole && (
-                            <div className="text-center mt-4 text-xs text-gray-400">
-                                <p>Demo Admin: admin@library.com / admin</p>
-                                <p>Demo Member: vimal@example.com / user123</p>
-                            </div>
-                        )}
 
                         <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-100">
                             <Link to="/" className="text-sm text-gray-500 hover:text-gray-800">Back</Link>

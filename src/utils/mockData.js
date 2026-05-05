@@ -99,31 +99,54 @@ if (storedVersion !== DATA_VERSION) {
     console.log('[Lumina] Data version updated. Seed data reset.');
 }
 
+// Initial Rack Photos Data with Shelf Pins
+const SEED_RACK_IMAGES = {
+    'R1': {
+        url: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&q=80&w=800',
+        pins: {
+            'A': { x: 30, y: 40 },
+            'B': { x: 30, y: 70 }
+        }
+    },
+    'R2': {
+        url: 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80&w=800',
+        pins: {
+            'A': { x: 50, y: 30 },
+            'C': { x: 50, y: 60 }
+        }
+    },
+    'R3': {
+        url: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&q=80&w=800',
+        pins: {
+            'D': { x: 40, y: 50 },
+            'E': { x: 70, y: 50 }
+        }
+    }
+};
+
 // Load from Storage or Initialize
 const storedUsers = localStorage.getItem('lumina_users');
 const storedBooks = localStorage.getItem('lumina_books');
-const storedLayout = localStorage.getItem('lumina_layout');
+const storedLayout = localStorage.getItem('lumina_rack_photos');
 
-let USERS, BOOKS, LAYOUT;
+let USERS, BOOKS, RACK_PHOTOS;
 
 try {
     USERS = storedUsers ? JSON.parse(storedUsers) : SEED_USERS;
 } catch (e) {
-    console.error('Failed to parse users from localStorage', e);
     USERS = SEED_USERS;
 }
 
 try {
     BOOKS = storedBooks ? JSON.parse(storedBooks) : SEED_BOOKS;
 } catch (e) {
-    console.error('Failed to parse books from localStorage', e);
     BOOKS = SEED_BOOKS;
 }
 
 try {
-    LAYOUT = storedLayout ? JSON.parse(storedLayout) : [];
+    RACK_PHOTOS = storedLayout ? JSON.parse(storedLayout) : SEED_RACK_IMAGES;
 } catch (e) {
-    LAYOUT = [];
+    RACK_PHOTOS = SEED_RACK_IMAGES;
 }
 
 // Helper to save
@@ -131,11 +154,10 @@ function save() {
     try {
         localStorage.setItem('lumina_users', JSON.stringify(USERS));
         localStorage.setItem('lumina_books', JSON.stringify(BOOKS));
-        localStorage.setItem('lumina_layout', JSON.stringify(LAYOUT));
+        localStorage.setItem('lumina_rack_photos', JSON.stringify(RACK_PHOTOS));
         return true;
     } catch (e) {
         console.error('Storage Quota Exceeded or Error', e);
-        alert('System Warning: Storage is full. Unable to save recent changes.');
         return false;
     }
 }
@@ -144,14 +166,12 @@ function save() {
 if (!storedUsers) save();
 
 export const db = {
-    // Getters ensure we always return the live in-memory array,
-    // not a stale snapshot from when the module first loaded.
     get users() { return USERS; },
     get books() { return BOOKS; },
-    get layout() { return LAYOUT; },
+    get rackPhotos() { return RACK_PHOTOS; },
 
-    saveLayout: (newLayout) => {
-        LAYOUT = newLayout;
+    saveRackPhotos: (newPhotos) => {
+        RACK_PHOTOS = newPhotos;
         save();
         return { success: true };
     },

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { db } from '../utils/mockData';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
 const AdminRegister = () => {
@@ -16,14 +15,15 @@ const AdminRegister = () => {
         district: '',
         librarianName: '',
         librarianId: '',
-        phone: ''
+        phone: '',
+        adminSecret: ''
     });
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
@@ -34,19 +34,26 @@ const AdminRegister = () => {
             return;
         }
 
-        // Simulate API call
-        setTimeout(() => {
+        try {
             const { confirmPassword, ...data } = formData;
-            const result = db.registerAdmin(data);
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/users/register-admin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
 
             if (result.success) {
                 alert('Admin Registration Successful!');
                 navigate('/login', { state: { role: 'ADMIN' } });
             } else {
-                setError(result.message);
+                setError(result.message || 'Registration failed');
                 setLoading(false);
             }
-        }, 1000);
+        } catch (err) {
+            setError('Server Error: Connection failed.');
+            setLoading(false);
+        }
     };
 
     return (
@@ -116,9 +123,15 @@ const AdminRegister = () => {
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Official Phone</label>
-                            <input type="tel" name="phone" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500" onChange={handleChange} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Official Phone</label>
+                                <input type="tel" name="phone" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500" onChange={handleChange} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-red-500 uppercase mb-1">Admin Secret Key</label>
+                                <input type="password" name="adminSecret" required placeholder="Required for Admin Setup" className="w-full px-3 py-2 border border-red-200 bg-red-50 rounded-lg focus:ring-2 focus:ring-red-500" onChange={handleChange} />
+                            </div>
                         </div>
 
                         <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white font-bold py-3 rounded-lg hover:bg-slate-800 transition-colors flex justify-center items-center gap-2">

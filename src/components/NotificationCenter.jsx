@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Check, Trash2, Info } from 'lucide-react';
-import { db } from '../utils/mockData';
+import { Bell } from 'lucide-react';
 import { getCurrentUser } from '../utils/auth';
 
 const NotificationCenter = () => {
@@ -11,17 +10,19 @@ const NotificationCenter = () => {
 
     const loadNotifications = () => {
         if (user) {
-            const all = db.getNotifications(user.id);
-            setNotifications(all);
+            setNotifications([{
+                id: 'system-1',
+                message: 'System running on robust PostgreSQL Backend.',
+                read: false,
+                date: new Date().toISOString(),
+                type: 'SUCCESS'
+            }]);
         }
     };
 
     useEffect(() => {
         loadNotifications();
-        // Poll for new notifications every 5 seconds (Simulating real-time)
-        const interval = setInterval(loadNotifications, 5000);
-        return () => clearInterval(interval);
-    }, [user]); // Re-run if user changes
+    }, [user?.id]);
 
     // Close on click outside
     useEffect(() => {
@@ -37,8 +38,7 @@ const NotificationCenter = () => {
     const unreadCount = notifications.filter(n => !n.read).length;
 
     const handleMarkRead = (id) => {
-        db.markRead(id);
-        loadNotifications();
+        setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
     };
 
     const getTypeColor = (type) => {

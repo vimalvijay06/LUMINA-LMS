@@ -1,21 +1,30 @@
-import { useState } from 'react';
-import { getCurrentUser } from '../../utils/auth';
-import { db } from '../../utils/mockData';
+import { useState, useEffect } from 'react';
+import { getCurrentUser, secureFetch } from '../../utils/auth';
 import { User, Mail, MapPin, Building, Phone, BadgeCheck, Activity, BookOpen, Users, Clock } from 'lucide-react';
 
 const AdminProfile = () => {
-    // Fetch fresh user data
     const sessionUser = getCurrentUser();
-    const user = db.users.find(u => u.id === sessionUser.id) || sessionUser;
+    const user = sessionUser;
 
-    // Stats
-    const totalBooks = db.books.length;
-    const activeMembers = db.users.filter(u => u.role === 'MEMBER').length;
-    const booksIssued = db.books.filter(b => b.status === 'ISSUED').length;
-    const overdueBooks = db.books.filter(b => {
-        if (b.status !== 'ISSUED' || !b.dueDate) return false;
-        return new Date() > new Date(b.dueDate);
-    }).length;
+    const [stats, setStats] = useState({
+        totalBooks: 0,
+        totalMembers: 0,
+        issuedBooks: 0,
+        overdueBooks: 0
+    });
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const res = await secureFetch(`${import.meta.env.VITE_API_URL}/stats`);
+                const data = await res.json();
+                setStats(data);
+            } catch (err) {
+                console.error("Failed to load stats", err);
+            }
+        };
+        fetchStats();
+    }, []);
 
     return (
         <div className="max-w-5xl mx-auto space-y-8">
@@ -47,18 +56,17 @@ const AdminProfile = () => {
                             </span>
                         </div>
 
-                        {/* Quick Stats */}
                         <div className="flex gap-4 flex-wrap">
                             <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100 min-w-[100px]">
-                                <div className="text-2xl font-bold text-slate-800">{totalBooks}</div>
+                                <div className="text-2xl font-bold text-slate-800">{stats.totalBooks}</div>
                                 <div className="text-xs text-slate-400 uppercase font-bold flex justify-center items-center gap-1"><BookOpen size={10} /> Books</div>
                             </div>
                             <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100 min-w-[100px]">
-                                <div className="text-2xl font-bold text-slate-800">{activeMembers}</div>
+                                <div className="text-2xl font-bold text-slate-800">{stats.totalMembers}</div>
                                 <div className="text-xs text-slate-400 uppercase font-bold flex justify-center items-center gap-1"><Users size={10} /> Members</div>
                             </div>
                             <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100 min-w-[100px]">
-                                <div className="text-2xl font-bold text-slate-800">{booksIssued}</div>
+                                <div className="text-2xl font-bold text-slate-800">{stats.issuedBooks}</div>
                                 <div className="text-xs text-slate-400 uppercase font-bold flex justify-center items-center gap-1"><Activity size={10} /> Issued</div>
                             </div>
                         </div>
@@ -106,14 +114,14 @@ const AdminProfile = () => {
                 </div>
             </div>
 
-            {overdueBooks > 0 && (
+            {stats.overdueBooks > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="bg-red-100 p-2 rounded-full">
                         <Clock className="text-red-600" />
                     </div>
                     <div>
                         <h4 className="font-bold text-red-800">Action Required</h4>
-                        <p className="text-red-600 text-sm">There are {overdueBooks} overdue books in your library. Please check the Booking Requests page.</p>
+                        <p className="text-red-600 text-sm">There are {stats.overdueBooks} overdue books in your library. Please check the Booking Requests page.</p>
                     </div>
                 </div>
             )}

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { db } from '../utils/mockData';
-import { Loader2, UserPlus, BookOpen, MapPin, Phone, CreditCard, Lock, User, Mail, ShieldCheck } from 'lucide-react';
+import { Loader2, UserPlus, BookOpen, MapPin, Phone, CreditCard, Lock, User, Mail, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
 
 const Register = () => {
     const navigate = useNavigate();
@@ -18,121 +17,124 @@ const Register = () => {
     });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    
+    // Aadhaar-specific validation state
+    const [aadhaarError, setAadhaarError] = useState('');
+    const [aadhaarOk, setAadhaarOk] = useState(false);
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+    // Allow only digit characters and max 12 length
+    const handleAadhaarChange = (e) => {
+        const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
+        setFormData(prev => ({ ...prev, aadhaar: digitsOnly }));
+        setAadhaarError('');
+        setAadhaarOk(digitsOnly.length === 12);
     };
 
-    const handleSubmit = (e) => {
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
         setSuccess('');
 
         if (formData.password !== formData.confirmPassword) {
-            setError("Passwords do not match");
+            setError('Passwords do not match.');
             setLoading(false);
             return;
         }
 
         if (formData.aadhaar.length !== 12) {
-            setError('Aadhaar Number must be exactly 12 digits');
+            setError('Aadhaar Number must be exactly 12 digits.');
             setLoading(false);
             return;
         }
 
-        setTimeout(() => {
-            const { confirmPassword, ...data } = formData;
-            const result = db.register(data);
+        const { confirmPassword, ...data } = formData;
+
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/users/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
 
             if (result.success) {
-                setSuccess('Application Submitted Successfully!');
-                // Optional: Clear form or redirect
+                setSuccess('Application Submitted! Please wait for admin approval.');
                 setTimeout(() => navigate('/login', { state: { role: 'MEMBER' } }), 2000);
             } else {
                 setError(result.message);
             }
-            setLoading(false);
-        }, 1500);
+        } catch (err) {
+            setError('Server Error: Connection failed. Check if backend is running.');
+        }
+        setLoading(false);
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-100">
+        <div className="register-wrapper">
+            <div className="register-card">
 
-                {/* Left Panel: Visual & Info */}
-                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-10 text-white md:w-5/12 flex flex-col justify-between relative overflow-hidden">
+                {/* ── Left Panel: Visual & Info ───────────────────── */}
+                <div className="register-left-panel">
                     {/* Decorative Circles */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+                    <div className="register-deco-circle-tr"></div>
+                    <div className="register-deco-circle-bl"></div>
 
                     <div>
-                        <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-6 backdrop-blur-sm">
+                        <div className="register-logo-box">
                             <UserPlus size={32} className="text-white" />
                         </div>
-                        <h1 className="text-3xl font-bold mb-4">Join Our Community of Readers</h1>
-                        <p className="text-indigo-100 leading-relaxed mb-6">
-                            Unlock access to thousands of books, digital resources, and exclusive member events.
-                            Start your journey today.
+                        <h1 className="register-heading">Member Registration</h1>
+                        <p className="register-subtext">
+                            Apply for a library membership to access books and digital resources.
                         </p>
 
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3 text-indigo-100">
-                                <BookOpen size={20} />
-                                <span className="text-sm font-medium">Unlimited borrowing privileges</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-indigo-100">
-                                <CreditCard size={20} />
-                                <span className="text-sm font-medium">Digital Membership Card</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-indigo-100">
-                                <ShieldCheck size={20} />
-                                <span className="text-sm font-medium">Secure & Private Access</span>
-                            </div>
-                        </div>
                     </div>
 
-                    <div className="mt-12 text-sm text-indigo-200">
-                        &copy; 2026 Lumina Library Systems
-                    </div>
+                    <div className="register-footer">&copy; 2026 Lumina Library Systems</div>
                 </div>
 
-                {/* Right Panel: Form */}
-                <div className="p-10 md:w-7/12 bg-white">
-                    <div className="flex justify-between items-center mb-8">
-                        <h2 className="text-2xl font-bold text-gray-800">Membership Application</h2>
-                        <Link to="/login" className="text-sm text-indigo-600 font-bold hover:underline">
-                            Login Instead
-                        </Link>
+                {/* ── Right Panel: Form ───────────────────────────── */}
+                <div className="register-right-panel">
+                    <div className="register-form-header">
+                        <h2 className="register-form-title">Membership Application</h2>
+                        <Link to="/login" className="register-login-link">Login Instead</Link>
                     </div>
 
                     {error && (
-                        <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-2 animate-pulse">
+                        <div className="alert-error">
                             <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                             {error}
                         </div>
                     )}
 
                     {success && (
-                        <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-2">
+                        <div className="alert-success">
                             <ShieldCheck size={16} />
                             {success} - Redirecting...
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Full Name</label>
+                    <form onSubmit={handleSubmit} className="register-form">
+
+                        {/* Row 1: Name + Email */}
+                        <div className="register-form-grid">
+                            <div className="field-group">
+                                <label className="form-label">Full Name</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <User size={16} className="text-gray-400" />
+                                    <div className="input-icon-wrapper">
+                                        <User size={16} className="input-icon" />
                                     </div>
                                     <input
                                         type="text"
                                         name="name"
                                         required
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300"
+                                        className="form-input"
                                         placeholder="John Doe"
                                         value={formData.name}
                                         onChange={handleChange}
@@ -140,18 +142,19 @@ const Register = () => {
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Email</label>
+                            <div className="field-group">
+                                <label className="form-label">Email</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Mail size={16} className="text-gray-400" />
+                                    <div className="input-icon-wrapper">
+                                        <Mail size={16} className="input-icon" />
                                     </div>
                                     <input
                                         type="email"
                                         name="email"
                                         required
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300"
+                                        className="form-input"
                                         placeholder="john@example.com"
+                                        autoComplete="email"
                                         value={formData.email}
                                         onChange={handleChange}
                                     />
@@ -159,18 +162,19 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Phone Number</label>
+                        {/* Row 2: Phone + Reference ID */}
+                        <div className="register-form-grid">
+                            <div className="field-group">
+                                <label className="form-label">Phone Number</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Phone size={16} className="text-gray-400" />
+                                    <div className="input-icon-wrapper">
+                                        <Phone size={16} className="input-icon" />
                                     </div>
                                     <input
                                         type="tel"
                                         name="phone"
                                         required
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300"
+                                        className="form-input"
                                         placeholder="+91 98765 43210"
                                         value={formData.phone}
                                         onChange={handleChange}
@@ -178,17 +182,17 @@ const Register = () => {
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Reference ID</label>
+                            <div className="field-group">
+                                <label className="form-label">Reference ID</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <User size={16} className="text-gray-400" />
+                                    <div className="input-icon-wrapper">
+                                        <User size={16} className="input-icon" />
                                     </div>
                                     <input
                                         type="text"
                                         name="referenceId"
                                         required
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300"
+                                        className="form-input"
                                         placeholder="Ref ID (e.g. M001)"
                                         value={formData.referenceId}
                                         onChange={handleChange}
@@ -197,17 +201,18 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Residential Address</label>
+                        {/* Address */}
+                        <div className="field-group">
+                            <label className="form-label">Residential Address</label>
                             <div className="relative">
-                                <div className="absolute top-3 left-3 pointer-events-none">
-                                    <MapPin size={16} className="text-gray-400" />
+                                <div className="input-icon-wrapper-top">
+                                    <MapPin size={16} className="input-icon" />
                                 </div>
                                 <textarea
                                     name="address"
                                     required
                                     rows="2"
-                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300 resize-none"
+                                    className="form-textarea"
                                     placeholder="Full street address, District, Pincode"
                                     value={formData.address}
                                     onChange={handleChange}
@@ -215,55 +220,95 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Aadhaar Number</label>
+                        {/* Aadhaar */}
+                        <div className="field-group">
+                            <div className="flex justify-between items-center">
+                                <label className="form-label">Aadhaar Number</label>
+                                {/* Live digit counter */}
+                                <span className={`text-xs font-mono font-bold ${formData.aadhaar.length === 12 ? 'text-green-600' : 'text-gray-400'
+                                    }`}>
+                                    {formData.aadhaar.length}/12
+                                </span>
+                            </div>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <CreditCard size={16} className="text-gray-400" />
+                                <div className="input-icon-wrapper">
+                                    <CreditCard size={16} className="input-icon" />
                                 </div>
                                 <input
                                     type="text"
                                     name="aadhaar"
                                     required
-                                    placeholder="12-digit Aadhaar Number"
+                                    inputMode="numeric"
+                                    placeholder="Enter 12-digit Aadhaar Number"
                                     maxLength="12"
-                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300 tracking-wide font-mono"
+                                    className={`form-input-mono ${aadhaarError
+                                            ? 'border-red-400 focus:ring-red-400 focus:border-red-400'
+                                            : aadhaarOk
+                                                ? 'border-green-400 focus:ring-green-400 focus:border-green-400'
+                                                : ''
+                                        }`}
                                     value={formData.aadhaar}
-                                    onChange={handleChange}
+                                    onChange={handleAadhaarChange}
                                 />
+                                {/* Status icon on the right */}
+                                {(aadhaarError || aadhaarOk) && (
+                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                        {aadhaarOk
+                                            ? <CheckCircle2 size={18} className="text-green-500" />
+                                            : <XCircle size={18} className="text-red-500" />
+                                        }
+                                    </div>
+                                )}
                             </div>
+                            {/* Inline error below field */}
+                            {aadhaarError && (
+                                <p className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                                    <XCircle size={12} />
+                                    {aadhaarError}
+                                </p>
+                            )}
+                            {aadhaarOk && (
+                                <p className="text-xs text-green-600 font-medium mt-1 flex items-center gap-1">
+                                    <CheckCircle2 size={12} />
+                                    Aadhaar verified — no duplicates found.
+                                </p>
+                            )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Create Password</label>
+                        {/* Row 3: Passwords */}
+                        <div className="register-form-grid">
+                            <div className="field-group">
+                                <label className="form-label">Create Password</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Lock size={16} className="text-gray-400" />
+                                    <div className="input-icon-wrapper">
+                                        <Lock size={16} className="input-icon" />
                                     </div>
                                     <input
                                         type="password"
                                         name="password"
                                         required
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300"
+                                        className="form-input"
                                         placeholder="••••••••"
+                                        autoComplete="new-password"
                                         value={formData.password}
                                         onChange={handleChange}
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Confirm Password</label>
+
+                            <div className="field-group">
+                                <label className="form-label">Confirm Password</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Lock size={16} className="text-gray-400" />
+                                    <div className="input-icon-wrapper">
+                                        <Lock size={16} className="input-icon" />
                                     </div>
                                     <input
                                         type="password"
                                         name="confirmPassword"
                                         required
-                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-300"
+                                        className="form-input"
                                         placeholder="••••••••"
+                                        autoComplete="new-password"
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
                                     />
@@ -271,15 +316,11 @@ const Register = () => {
                             </div>
                         </div>
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all transform active:scale-[0.99] flex justify-center items-center gap-2 mt-4"
-                        >
+                        <button type="submit" disabled={loading} className="btn-primary">
                             {loading ? <Loader2 className="animate-spin" /> : 'Apply for Membership'}
                         </button>
 
-                        <p className="text-xs text-center text-gray-400 mt-4">
+                        <p className="register-tos">
                             By registering, you agree to Lumina Library's Terms & Conditions.
                         </p>
                     </form>

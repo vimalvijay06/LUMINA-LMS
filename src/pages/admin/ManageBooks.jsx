@@ -1,65 +1,56 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../utils/mockData';
-import { Search, Plus, X, Image as ImageIcon, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, X, Image as ImageIcon, Edit, Trash2, MapPin, AlertCircle, Upload, Sparkles, Loader2 } from 'lucide-react';
+import { secureFetch } from '../../utils/auth';
 
 const ManageBooks = () => {
     const [books, setBooks] = useState([]);
+    const [rackPhotos, setRackPhotos] = useState({});
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingBook, setEditingBook] = useState(null);
+    const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
-        title: '', author: '', category: '', rack: '', shelf: '', section: '', coverUrl: ''
+        title: '', author: '', category: '', rack: '', shelf: '', section: '', coverUrl: '', description: '',
+        x: null, y: null
     });
 
-    const loadBooks = () => {
-        // Deduplicate by id — safety net against any stale data
-        const seen = new Set();
-        const fresh = db.books.filter(b => {
-            if (seen.has(b.id)) return false;
-            seen.add(b.id);
-            return true;
-        });
-        setBooks([...fresh]);
+    const loadData = async () => {
+        try {
+            const [booksRes, racksRes] = await Promise.all([
+                secureFetch(`${import.meta.env.VITE_API_URL}/books`),
+                secureFetch(`${import.meta.env.VITE_API_URL}/racks`)
+            ]);
+            setBooks(await booksRes.json());
+            setRackPhotos(await racksRes.json());
+        } catch (err) { console.error(err); }
     };
 
-    useEffect(() => {
-        loadBooks();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
-    const handleDelete = (book) => {
-        if (!confirm(`Delete "${book.title}"? This cannot be undone.`)) return;
-        const result = db.deleteBook(book.id);
-        if (!result.success) {
-            alert(result.message);
-            return;
-        }
-        loadBooks(); // refresh list
+    const handleDelete = async (book) => {
+        if (!confirm(`Delete "${book.title}"?`)) return;
+        try {
+            await secureFetch(`${import.meta.env.VITE_API_URL}/books/${book.id}`, { method: 'DELETE' });
+            loadData();
+        } catch (err) { alert("Delete failed"); }
     };
-
-    const filteredBooks = books.filter(b =>
-        b.title.toLowerCase().includes(search.toLowerCase()) ||
-        b.author.toLowerCase().includes(search.toLowerCase()) ||
-        (b.category || '').toLowerCase().includes(search.toLowerCase()) ||
-        (b.location?.rack || '').toLowerCase().includes(search.toLowerCase())
-    );
 
     const handleOpenModal = (book = null) => {
         if (book) {
             setEditingBook(book);
             setFormData({
-                title: book.title,
-                author: book.author,
-                category: book.category,
-                rack: book.location.rack,
-                shelf: book.location.shelf,
-                section: book.location.section,
-                coverUrl: book.coverUrl
+                title: book.title, author: book.author, category: book.category,
+                rack: book.location.rack, shelf: book.location.shelf, section: book.location.section || '',
+                coverUrl: book.coverUrl,
+                description: book.description || '',
+                x: book.location.position?.x || null,
+                y: book.location.position?.y || null
             });
         } else {
             setEditingBook(null);
-            setFormData({ title: '', author: '', category: '', rack: '', shelf: '', section: '', coverUrl: '' });
+            setFormData({ title: '', author: '', category: '', rack: '', shelf: '', section: '', coverUrl: '', description: '', x: null, y: null });
         }
         setIsModalOpen(true);
     };
@@ -70,200 +61,230 @@ const ManageBooks = () => {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, coverUrl: reader.result }));
-            };
+            reader.onloadend = () => setFormData(prev => ({ ...prev, coverUrl: reader.result }));
             reader.readAsDataURL(file);
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleRackClick = (e) => {
+        const rect = e.target.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        setFormData(prev => ({ ...prev, x: Math.round(x), y: Math.round(y) }));
+    };
+
+    const generateAiDescription = async () => {
+        if (!formData.title || !formData.author) {
+            alert("Please enter title and author first.");
+            return;
+        }
+        setIsGeneratingAi(true);
+        try {
+            const res = await secureFetch(`${import.meta.env.VITE_API_URL}/ai/generate-description`, {
+                method: 'POST',
+                body: JSON.stringify({ title: formData.title, author: formData.author })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setFormData(prev => ({ ...prev, description: data.description }));
+            }
+        } catch (err) {
+            alert("AI generation failed.");
+        } finally {
+            setIsGeneratingAi(false);
+        }
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const bookData = {
-            title: formData.title,
-            author: formData.author,
-            category: formData.category || 'General',
-            coverUrl: formData.coverUrl,
-            location: {
-                rack: formData.rack,
-                shelf: formData.shelf,
-                section: formData.section
+            ...formData,
+            location: { 
+                rack: formData.rack, 
+                shelf: formData.shelf, 
+                section: formData.section,
+                position: { x: formData.x, y: formData.y }
             }
         };
-
-        if (editingBook) {
-            db.updateBook({ id: editingBook.id, ...bookData });
-        } else {
-            db.addBook({
-                id: 'B' + Date.now(),
-                ...bookData,
-                status: 'AVAILABLE',
-                issuedTo: null,
-                dueDate: null,
-                waitlist: []
+        const method = editingBook ? 'PATCH' : 'POST';
+        const url = editingBook ? `${import.meta.env.VITE_API_URL}/books/${editingBook.id}` : `${import.meta.env.VITE_API_URL}/books`;
+        
+        try {
+            const res = await secureFetch(url, {
+                method,
+                body: JSON.stringify(bookData)
             });
-        }
-        setBooks([...db.books]); // Force refresh with live data
-        handleCloseModal();
+            const result = await res.json();
+            if (result.success) {
+                loadData();
+                handleCloseModal();
+            } else {
+                alert("Error: " + result.message);
+            }
+        } catch (err) { alert("Server Error"); }
     };
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-800">Books Inventory</h1>
-                <div className="flex gap-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                            type="text"
-                            placeholder="Search books..."
-                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none w-64"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+            <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100 gap-4">
+                <div>
+                    <h1 className="text-2xl font-black text-gray-800 tracking-tight">Library Assets</h1>
+                    <p className="text-gray-400 text-sm">Managing {books.length} real-time books in MongoDB.</p>
+                </div>
+                <div className="flex gap-4 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                         <input className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none" placeholder="Quick search..." value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                    >
-                        <Plus size={18} /> Add New Book
+                    <button onClick={() => handleOpenModal()} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-100">
+                        <Plus size={18} /> Register Book
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th className="p-4 font-semibold text-gray-600">Book Details</th>
-                            <th className="p-4 font-semibold text-gray-600">Status</th>
-                            <th className="p-4 font-semibold text-gray-600">Location</th>
-                            <th className="p-4 font-semibold text-gray-600">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {filteredBooks.length === 0 ? (
-                            <tr>
-                                <td colSpan="4" className="p-8 text-center text-gray-500">No books found.</td>
-                            </tr>
-                        ) : (
-                            filteredBooks.map(book => (
-                                <tr key={book.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="p-4">
-                                        <div className="flex gap-4 items-center">
-                                            <img src={book.coverUrl || 'https://placehold.co/50x75?text=Cover'} alt="cover" className="w-10 h-14 object-cover rounded shadow-sm border border-gray-200" />
-                                            <div>
-                                                <div className="font-semibold text-gray-800">{book.title}</div>
-                                                <div className="text-sm text-gray-500">{book.author}</div>
-                                                <div className="text-xs text-gray-400 mt-1 font-mono">{book.id}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${book.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' :
-                                            book.status === 'RESERVED' ? 'bg-amber-100 text-amber-700' :
-                                                'bg-red-100 text-red-700'
-                                            }`}>
-                                            {book.status}
-                                        </span>
-                                        {(book.status !== 'AVAILABLE' && book.issuedTo) && (
-                                            <div className="text-xs text-gray-500 mt-2">
-                                                {book.status === 'RESERVED' ? 'Reserved For:' : 'Issued To:'} <span className="font-medium text-gray-700">{book.issuedTo}</span>
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="text-sm font-medium text-gray-700">Rack {book.location.rack}</div>
-                                        <div className="text-xs text-gray-500">Shelf {book.location.shelf} ({book.location.section})</div>
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleOpenModal(book)}
-                                                className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
-                                                title="Edit"
-                                            >
-                                                <Edit size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(book)}
-                                                className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors border border-transparent hover:border-red-100"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {books.filter(b => (b.title || '').toLowerCase().includes(search.toLowerCase())).map(book => (
+                    <div key={book.id} className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden">
+                        <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-50">
+                            <img src={book.coverUrl || 'https://placehold.co/300x400?text=No+Cover'} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                            <div className="absolute top-3 right-3 flex flex-col gap-2">
+                                <button onClick={() => handleOpenModal(book)} className="p-2 bg-white/90 backdrop-blur shadow-lg rounded-full text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all"><Edit size={16} /></button>
+                                <button onClick={() => handleDelete(book)} className="p-2 bg-white/90 backdrop-blur shadow-lg rounded-full text-red-500 hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16} /></button>
+                            </div>
+                            <div className="absolute bottom-3 left-3 right-3 bg-black/60 backdrop-blur-md p-3 rounded-xl border border-white/10">
+                                <p className="text-white text-[10px] font-black uppercase tracking-widest leading-none mb-1">Rack {book.location.rack}</p>
+                                <p className="text-white/60 text-[8px] font-bold">Shelf {book.location.shelf} • {book.location.section || 'General'}</p>
+                            </div>
+                        </div>
+                        <div className="mt-4 px-1">
+                            <h3 className="font-bold text-gray-800 line-clamp-1">{book.title}</h3>
+                            <p className="text-xs text-gray-400 font-medium">{book.author}</p>
+                        </div>
+                    </div>
+                ))}
             </div>
 
-            {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                            <h2 className="text-lg font-bold text-gray-800">{editingBook ? 'Edit Book' : 'Add New Book'}</h2>
-                            <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                            {/* Image Upload */}
-                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:bg-gray-50 transition relative group">
-                                <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-7xl shadow-2xl overflow-hidden my-auto flex flex-col lg:flex-row">
+                        
+                        {/* LEFT: Book Image & Description */}
+                        <div className="lg:w-1/4 bg-gray-50 p-8 border-r flex flex-col">
+                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Book Assets</h3>
+                            
+                            <div className="relative group w-full aspect-[3/4] bg-white rounded-3xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden transition-all hover:border-indigo-400 mb-6">
+                                <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                 {formData.coverUrl ? (
-                                    <img src={formData.coverUrl} alt="Preview" className="h-32 mx-auto rounded shadow-sm object-contain" />
+                                    <img src={formData.coverUrl} className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="py-4">
-                                        <ImageIcon className="mx-auto text-gray-400 mb-2" size={32} />
-                                        <span className="text-sm text-gray-500">Click or Drag to upload cover</span>
+                                    <div className="text-center p-6">
+                                        <Upload className="mx-auto text-gray-300 mb-2" size={32} />
+                                        <p className="text-[10px] font-bold text-gray-400">BOOK PHOTO</p>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="grid gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                                    <input type="text" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Brief Description</label>
+                                    <button 
+                                        type="button"
+                                        onClick={generateAiDescription}
+                                        disabled={isGeneratingAi}
+                                        className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 hover:text-indigo-800 transition-colors disabled:opacity-50"
+                                    >
+                                        {isGeneratingAi ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                        AI GEN
+                                    </button>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Author</label>
-                                    <input type="text" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        value={formData.author} onChange={e => setFormData({ ...formData, author: e.target.value })} />
+                                <textarea 
+                                    className="w-full h-32 p-4 bg-white border border-gray-200 rounded-2xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-medium text-gray-600"
+                                    placeholder="Write a brief summary or use AI generate..."
+                                    value={formData.description}
+                                    onChange={e => setFormData({...formData, description: e.target.value})}
+                                />
+                            </div>
+                        </div>
+
+                        {/* MIDDLE: Precision Pinning (Visual Map) */}
+                        <div className="lg:w-2/4 bg-gray-950 p-8 flex flex-col">
+                            <div className="mb-6">
+                                <h3 className="text-white text-lg font-black flex items-center gap-2 uppercase tracking-widest">
+                                    <MapPin className="text-indigo-400" size={18} /> Physical Mapping
+                                </h3>
+                                <p className="text-gray-500 text-[10px] font-bold mt-1">SELECT RACK, THEN CLICK PHOTO TO PIN BOOK LOCATION</p>
+                            </div>
+
+                            <div className="flex-1 flex flex-col justify-center">
+                                {rackPhotos[formData.rack] ? (
+                                    <div className="relative rounded-[2rem] overflow-hidden border-2 border-white/10 shadow-3xl bg-black transition-all">
+                                        <img 
+                                            src={rackPhotos[formData.rack].url} 
+                                            className="w-full h-auto cursor-crosshair opacity-70" 
+                                            onClick={handleRackClick}
+                                        />
+                                        
+                                        {formData.x !== null && (
+                                            <div 
+                                                className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20"
+                                                style={{ left: `${formData.x}%`, top: `${formData.y}%` }}
+                                            >
+                                                <div className="relative">
+                                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-75"></div>
+                                                    <div className="relative bg-white text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center shadow-2xl border-2 border-indigo-600">
+                                                        <MapPin size={16} fill="currentColor" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {Object.entries(rackPhotos[formData.rack].pins || {}).map(([s, p]) => (
+                                            <div key={s} className="absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 border border-white/20 rounded-full flex items-center justify-center text-[8px] font-bold text-white/30" style={{ left: `${p.x}%`, top: `${p.y}%` }}>{s}</div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="aspect-video border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center text-gray-600 p-8 text-center bg-white/5">
+                                        <AlertCircle size={32} className="mb-4 opacity-10" />
+                                        <p className="text-xs font-bold uppercase tracking-widest">Enter Rack ID to view Map</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* RIGHT: Data Form */}
+                        <form onSubmit={handleSubmit} className="lg:w-1/4 p-8 space-y-6 bg-white flex flex-col justify-between border-l">
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-black text-gray-800 uppercase tracking-tighter">{editingBook ? 'Update Book' : 'New Registration'}</h2>
+                                    <button type="button" onClick={handleCloseModal} className="text-gray-300 hover:text-gray-900"><X size={24} /></button>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                                    <input type="text" placeholder="Fiction, Sci-Fi..." className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
+
+                                <div className="space-y-4">
+                                    <input required className="w-full px-4 py-3 bg-gray-50 border rounded-xl outline-none text-sm font-bold" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Book Title" />
+                                    <input required className="w-full px-4 py-3 bg-gray-50 border rounded-xl outline-none text-sm font-bold" value={formData.author} onChange={e => setFormData({...formData, author: e.target.value})} placeholder="Author" />
+                                    <input className="w-full px-4 py-3 bg-gray-50 border rounded-xl outline-none text-sm font-bold" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} placeholder="Category" />
+                                    
+                                    <div className="grid grid-cols-2 gap-2 mt-4">
+                                        <div className="bg-indigo-50 p-3 rounded-2xl">
+                                            <label className="text-[8px] font-black text-indigo-400 uppercase text-center block mb-1">Rack ID</label>
+                                            <input required className="w-full bg-transparent text-center font-black text-indigo-700 outline-none" value={formData.rack} onChange={e => setFormData({...formData, rack: e.target.value.toUpperCase()})} placeholder="R1" />
+                                        </div>
+                                        <div className="bg-indigo-50 p-3 rounded-2xl">
+                                            <label className="text-[8px] font-black text-indigo-400 uppercase text-center block mb-1">Shelf</label>
+                                            <input required className="w-full bg-transparent text-center font-black text-indigo-700 outline-none" value={formData.shelf} onChange={e => setFormData({...formData, shelf: e.target.value})} placeholder="A" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-gray-50 p-3 rounded-2xl">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase text-center block mb-1">Detailed Section</label>
+                                        <input required className="w-full bg-transparent text-center font-bold text-gray-700 outline-none" value={formData.section} onChange={e => setFormData({...formData, section: e.target.value})} placeholder="e.g. Left Corner" />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Rack</label>
-                                    <input type="text" placeholder="R1" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        value={formData.rack} onChange={e => setFormData({ ...formData, rack: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Shelf</label>
-                                    <input type="text" placeholder="A" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        value={formData.shelf} onChange={e => setFormData({ ...formData, shelf: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                                    <input type="text" placeholder="Fiction" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        value={formData.section} onChange={e => setFormData({ ...formData, section: e.target.value })} />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <button type="button" onClick={handleCloseModal} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                                <button type="submit" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md shadow-indigo-200">Save Book</button>
-                            </div>
+                            <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">
+                                {editingBook ? 'UPDATE RECODE' : 'SAVE TO ASSETS'}
+                            </button>
                         </form>
                     </div>
                 </div>
