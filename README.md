@@ -1,5 +1,7 @@
 # 📚 LUMINA Library Management System
 
+**Live Production Link:** [https://lumina-da6v80tt5-vimals-projects-e2b5a73c.vercel.app](https://lumina-da6v80tt5-vimals-projects-e2b5a73c.vercel.app)
+
 LUMINA-LMS is a modern, full-stack library management system designed for seamless book circulation, real-time tracking, and AI-powered member assistance.
 
 ## 🚀 Key Features
