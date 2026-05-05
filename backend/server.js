@@ -12,11 +12,8 @@ const statsRoutes = require('./routes/stats');
 const aiRoutes = require('./routes/ai');
 
 const app = express();
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors()); // Absolute most permissive
+app.options('*', cors()); // Allow preflight for all routes
 app.use(express.json());
 
 // Request Tracker (to see if Vercel is reaching us)
