@@ -14,6 +14,9 @@ const aiRoutes = require('./routes/ai');
 const app = express();
 app.use(cors());
 app.use(express.json());
+ 
+// Root Route
+app.get('/', (req, res) => res.send('🚀 Lumina Library Backend is Running!'));
 
 const pool = require('./db');
 
