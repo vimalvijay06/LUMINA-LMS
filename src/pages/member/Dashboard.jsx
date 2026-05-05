@@ -39,8 +39,8 @@ const MemberDashboard = () => {
             const books = await booksRes.json();
 
             if (Array.isArray(books)) {
-                const issued = books.filter(b => b.issuedTo === latestUser.id && b.status === 'ISSUED');
-                const reserved = books.filter(b => b.issuedTo === latestUser.id && b.status === 'RESERVED');
+                const issued = books.filter(b => b.issuedToId === latestUser.id && b.status === 'ISSUED');
+                const reserved = books.filter(b => b.issuedToId === latestUser.id && b.status === 'RESERVED');
                 const waitlist = books.filter(b => b.waitlist && b.waitlist.includes(latestUser.id));
 
                 setStats({ issued, reserved, waitlist, fines: latestUser.finesOwed || 0 });

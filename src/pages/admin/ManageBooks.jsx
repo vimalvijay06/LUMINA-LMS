@@ -169,8 +169,13 @@ const ManageBooks = () => {
                                     )}
                                 </div>
                                 <p className="text-white/60 text-[8px] font-bold">Shelf {book.location.shelf} • {book.location.section || 'General'}</p>
-                                {book.waitlist && book.waitlist.length > 0 && (
-                                    <p className="text-white/40 text-[7px] mt-1 font-mono truncate">IDs: {book.waitlist.join(', ')}</p>
+                                {book.issuedToId && (
+                                    <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
+                                        <p className="text-[7px] font-black text-white/40 uppercase tracking-widest">
+                                            {book.status === 'ISSUED' ? 'Issued To' : 'Reserved For'}
+                                        </p>
+                                        <p className="text-[8px] font-black text-indigo-300 font-mono">{book.issuedToId}</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -371,6 +376,30 @@ const ManageBooks = () => {
                                         <p className="text-sm font-bold text-gray-800">{inspectingBook.isbn || 'N/A'}</p>
                                     </div>
                                 </div>
+
+                                {inspectingBook.issuedToId && (
+                                    <div className={`p-6 rounded-3xl border ${inspectingBook.status === 'ISSUED' ? 'bg-blue-50 border-blue-100' : 'bg-amber-50 border-amber-100'}`}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${inspectingBook.status === 'ISSUED' ? 'text-blue-600' : 'text-amber-600'}`}>
+                                                    {inspectingBook.status === 'ISSUED' ? 'Currently Issued To' : 'Reserved For Pickup By'}
+                                                </p>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${inspectingBook.status === 'ISSUED' ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white'}`}>
+                                                        {inspectingBook.issuedToId.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-gray-800">{inspectingBook.issuedToId}</p>
+                                                        <p className="text-[10px] text-gray-400 font-medium">Due Date: {new Date(inspectingBook.dueDate).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${inspectingBook.status === 'ISSUED' ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white'}`}>
+                                                {inspectingBook.status}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {inspectingBook.waitlist && inspectingBook.waitlist.length > 0 && (
                                     <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100">
