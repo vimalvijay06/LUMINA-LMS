@@ -11,6 +11,7 @@ const IssueReturn = () => {
     const [currentMember, setCurrentMember] = useState(null);
     const [scanTarget, setScanTarget] = useState(null); // 'member' | 'book'
     const [isScanning, setIsScanning] = useState(false);
+    const [books, setBooks] = useState([]);
     const [isInverted, setIsInverted] = useState(false);
 
     // Inputs
@@ -35,6 +36,9 @@ const IssueReturn = () => {
             const user = users.find(u => u.id === userId);
             
             if (user) {
+                const booksRes = await secureFetch(`${import.meta.env.VITE_API_URL}/books`);
+                const booksData = await booksRes.json();
+                setBooks(booksData);
                 setCurrentMember(user);
                 setMemberIdInput('');
                 setMessage(null);
@@ -55,8 +59,13 @@ const IssueReturn = () => {
     const refreshMemberData = async () => {
         if (!currentMember) return;
         try {
-            const res = await secureFetch(`${import.meta.env.VITE_API_URL}/users`);
-            const users = await res.json();
+            const [usersRes, booksRes] = await Promise.all([
+                secureFetch(`${import.meta.env.VITE_API_URL}/users`),
+                secureFetch(`${import.meta.env.VITE_API_URL}/books`)
+            ]);
+            const users = await usersRes.json();
+            const booksData = await booksRes.json();
+            setBooks(booksData);
             const updated = users.find(u => u.id === currentMember.id);
             if (updated) setCurrentMember(updated);
         } catch (err) { console.error(err); }
@@ -328,17 +337,54 @@ const IssueReturn = () => {
                         </div>
 
                         {/* Currently Borrowed list for Return/Renewal */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                <RotateCw size={18} className="text-indigo-600" /> Active Loans
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <RotateCw size={18} className="text-indigo-600" /> Active Transactions
                             </h3>
-                            {/* This should be a list of books where issuedTo === currentMember.id */}
-                            {/* For brevity, let's assume we fetch them and show them. */}
-                            {/* We can just show a reminder or implement a small search/list */}
-                            <p className="text-xs text-gray-400 italic">Please go to 'Manage Members' to see detailed return history or use the quick return scanner below.</p>
-                            <button onClick={() => startScan('book-return')} className="mt-4 w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 text-sm font-bold hover:bg-gray-50 transition">
-                                Scan to Return Book
-                            </button>
+                            
+                            <div className="space-y-3">
+                                {/* ISSUED BOOKS */}
+                                {books.filter(b => b.issuedToId === currentMember.id && b.status === 'ISSUED').map(book => (
+                                    <div key={book.id} className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+                                        <div className="flex items-center gap-3">
+                                            <img src={book.coverUrl} className="w-10 h-14 object-cover rounded shadow-sm" />
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-800 line-clamp-1">{book.title}</p>
+                                                <p className="text-[10px] text-blue-600 font-bold uppercase">ISSUED • Due {new Date(book.dueDate).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleReturnBook(book.id)} className="px-4 py-2 bg-white text-blue-600 border border-blue-200 rounded-lg text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                                            RETURN
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {/* RESERVED BOOKS */}
+                                {books.filter(b => b.issuedToId === currentMember.id && b.status === 'RESERVED').map(book => (
+                                    <div key={book.id} className="flex items-center justify-between p-3 bg-amber-50/50 rounded-xl border border-amber-100">
+                                        <div className="flex items-center gap-3">
+                                            <img src={book.coverUrl} className="w-10 h-14 object-cover rounded shadow-sm" />
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-800 line-clamp-1">{book.title}</p>
+                                                <p className="text-[10px] text-amber-600 font-bold uppercase">RESERVED • Ready for Pickup</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => { setBookIdInput(book.id); handleIssueBook(book.id); }} className="px-4 py-2 bg-white text-amber-600 border border-amber-200 rounded-lg text-[10px] font-black hover:bg-amber-600 hover:text-white transition-all shadow-sm">
+                                            ISSUE NOW
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {books.filter(b => b.issuedToId === currentMember.id).length === 0 && (
+                                    <p className="text-xs text-gray-400 italic text-center py-4">No active loans or reservations.</p>
+                                )}
+                            </div>
+
+                            <div className="pt-2">
+                                <button onClick={() => startScan('book-return')} className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 text-sm font-bold hover:bg-gray-50 transition flex items-center justify-center gap-2">
+                                    <Camera size={16} /> Scan to Return (External)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

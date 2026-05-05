@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { secureFetch } from '../../utils/auth';
-import { Save, Plus, Trash2, Camera, MapPin, Search, Edit3, X, AlertCircle } from 'lucide-react';
+import { Save, Plus, Trash2, Camera, MapPin, Search, Edit3, X, AlertCircle, Upload, Loader2 } from 'lucide-react';
 
 const RackLayout = () => {
     const [rackPhotos, setRackPhotos] = useState({});
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingRackId, setEditingRackId] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
     const [newRackData, setNewRackData] = useState({ id: '', url: '' });
 
     const fetchRacks = async () => {
@@ -32,9 +33,21 @@ const RackLayout = () => {
 
     const addOrUpdateRack = (e) => {
         e.preventDefault();
+        if (!newRackData.url) { alert("Please upload or provide an image URL."); return; }
         handleSaveRack(newRackData.id, newRackData.url, rackPhotos[newRackData.id]?.pins || {});
         setIsAddModalOpen(false);
         setNewRackData({ id: '', url: '' });
+    };
+
+    const handleFileUpload = (file) => {
+        if (!file) return;
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setNewRackData(prev => ({ ...prev, url: reader.result }));
+            setIsUploading(false);
+        };
+        reader.readAsDataURL(file);
     };
 
     const addPin = (e) => {
@@ -137,11 +150,42 @@ const RackLayout = () => {
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <form onSubmit={addOrUpdateRack} className="bg-white rounded-3xl w-full max-w-md p-8 space-y-4">
                         <h3 className="text-xl font-bold">New Rack Photo</h3>
-                        <input required className="w-full p-4 bg-gray-50 border rounded-2xl" value={newRackData.id} onChange={e => setNewRackData({...newRackData, id: e.target.value.toUpperCase()})} placeholder="Rack ID (e.g. R1)" />
-                        <input required className="w-full p-4 bg-gray-50 border rounded-2xl" value={newRackData.url} onChange={e => setNewRackData({...newRackData, url: e.target.value})} placeholder="Photo URL" />
+                        
+                        <div 
+                            className="relative group w-full aspect-video bg-gray-50 rounded-2xl border-4 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden transition-all hover:border-indigo-400"
+                            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-indigo-500'); }}
+                            onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-indigo-500'); }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.remove('border-indigo-500');
+                                handleFileUpload(e.dataTransfer.files[0]);
+                            }}
+                        >
+                            <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                            {newRackData.url ? (
+                                <img src={newRackData.url} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="text-center p-6">
+                                    {isUploading ? <Loader2 className="mx-auto text-indigo-500 animate-spin" /> : <Upload className="mx-auto text-gray-300 mb-2" size={32} />}
+                                    <p className="text-[10px] font-bold text-gray-400">DRAG & DROP RACK PHOTO</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <input required className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500" value={newRackData.id} onChange={e => setNewRackData({...newRackData, id: e.target.value.toUpperCase()})} placeholder="Rack ID (e.g. R1)" />
+                        
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+                            <div className="relative text-[8px] text-gray-400 font-bold bg-white px-2 inline-block uppercase tracking-widest">OR MANUAL URL</div>
+                        </div>
+
+                        <input className="w-full p-4 bg-gray-50 border rounded-2xl outline-none text-xs" value={newRackData.url} onChange={e => setNewRackData({...newRackData, url: e.target.value})} placeholder="Direct Image URL" />
+                        
                         <div className="flex gap-4 pt-4">
-                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 text-gray-500">Cancel</button>
-                            <button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">Add Rack</button>
+                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 text-gray-500 font-bold">Cancel</button>
+                            <button type="submit" disabled={isUploading || !newRackData.url} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 disabled:opacity-50">
+                                Save Rack
+                            </button>
                         </div>
                     </form>
                 </div>
