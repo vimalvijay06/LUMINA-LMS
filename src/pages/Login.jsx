@@ -51,7 +51,8 @@ const Login = () => {
                 setLoading(false);
             }
         } catch (err) {
-            setError('Server Error: Connection failed.');
+            console.error("Login Error:", err);
+            setError(`Connection Failed: ${err.message}. Please check if VITE_API_URL is correct.`);
             setLoading(false);
         }
     };
