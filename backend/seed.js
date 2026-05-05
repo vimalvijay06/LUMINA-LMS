@@ -58,15 +58,12 @@ const seedDB = async () => {
     try {
         console.log('Connected to PostgreSQL. Rebuilding schema with Raw SQL...');
 
-        // 1. Drop existing tables if they exist
-        await pool.query(`
-            DROP SCHEMA public CASCADE;
-            CREATE SCHEMA public;
-        `);
+        // 1. Schema check
+        console.log('Ensuring tables exist...');
 
         // 2. Create tables
         await pool.query(`
-            CREATE TABLE users (
+            CREATE TABLE IF NOT EXISTS users (
                 id VARCHAR(50) PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 email VARCHAR(255) UNIQUE NOT NULL,
@@ -80,8 +77,8 @@ const seedDB = async () => {
                 fines_owed FLOAT DEFAULT 0,
                 joined_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-
-            CREATE TABLE books (
+ 
+            CREATE TABLE IF NOT EXISTS books (
                 id VARCHAR(50) PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
                 author VARCHAR(255) NOT NULL,
@@ -94,8 +91,8 @@ const seedDB = async () => {
                 due_date TIMESTAMP,
                 waitlist JSONB DEFAULT '[]'::JSONB
             );
-
-            CREATE TABLE racks (
+ 
+            CREATE TABLE IF NOT EXISTS racks (
                 id VARCHAR(50) PRIMARY KEY,
                 url TEXT NOT NULL,
                 pins JSONB
