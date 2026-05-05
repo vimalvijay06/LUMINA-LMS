@@ -9,6 +9,16 @@ const BookingRequests = () => {
     const [allBooks, setAllBooks] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
     const fetchBooks = async () => {
         setLoading(true);
         try {
@@ -157,7 +167,7 @@ const BookingRequests = () => {
                                         <img src={book.coverUrl} className="book-thumb" />
                                         <div>
                                             <h4 className="font-bold text-gray-800">{book.title}</h4>
-                                            <div className="text-sm text-amber-600 font-medium">Reserved until {book.dueDate}</div>
+                                            <div className="text-sm text-amber-600 font-medium">Reserved until {formatDate(book.dueDate)}</div>
                                         </div>
                                     </div>
 
@@ -205,7 +215,7 @@ const BookingRequests = () => {
                                             <img src={book.coverUrl} className="book-thumb-grayscale" />
                                             <div>
                                                 <h4 className="font-bold text-gray-800">{book.title}</h4>
-                                                <div className="text-sm text-red-600 font-bold">Due: {book.dueDate}</div>
+                                                <div className="text-sm text-red-600 font-bold">Due: {formatDate(book.dueDate)}</div>
                                                 <div className="text-xs text-red-500 mt-1">{daysOverdue} days overdue</div>
                                             </div>
                                         </div>
