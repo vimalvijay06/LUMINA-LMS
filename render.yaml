@@ -5,6 +5,7 @@ services:
     rootDir: backend
     buildCommand: npm install
     startCommand: node server.js
+    plan: free
     envVars:
       - key: DATABASE_URL
         sync: false
