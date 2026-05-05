@@ -43,7 +43,7 @@ const ManageMembers = () => {
             const result = await res.json();
             if (result.success) {
                 alert('Member Approved Successfully!');
-                loadMembers();
+                loadData();
             } else {
                 alert('Approval Failed: ' + result.message);
             }
@@ -56,6 +56,16 @@ const ManageMembers = () => {
     const memberLoans = selectedMember ? books.filter(b => b.issuedToId === selectedMember.id && b.status === 'ISSUED') : [];
     const memberWaitlist = selectedMember ? books.filter(b => (b.waitlist || []).includes(selectedMember.id)) : [];
     const memberReservations = selectedMember ? books.filter(b => b.issuedToId === selectedMember.id && b.status === 'RESERVED') : [];
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
 
     const calculateFine = (book) => {
         if (!book.dueDate) return 0;
@@ -211,7 +221,7 @@ const ManageMembers = () => {
                                     </div>
                                     <div className="info-row">
                                         <span className="info-label">Joined</span>
-                                        <span className="info-value">{selectedMember.joinedDate}</span>
+                                        <span className="info-value">{formatDate(selectedMember.joinedDate)}</span>
                                     </div>
                                     <div className="info-divider">
                                         <span className="info-address-label">Address</span>
@@ -244,7 +254,7 @@ const ManageMembers = () => {
                                                             <div className="book-author-sm">{book.author}</div>
 
                                                             <div className={`text-xs font-bold flex items-center gap-1 ${isOverdue ? 'text-red-600' : 'text-green-600'}`}>
-                                                                <Calendar size={12} /> Due: {book.dueDate}
+                                                                <Calendar size={12} /> Due: {formatDate(book.dueDate)}
                                                             </div>
 
                                                             {isOverdue && (
@@ -297,7 +307,7 @@ const ManageMembers = () => {
                                                 <div>
                                                     <div className="book-title-sm">{book.title}</div>
                                                     <div className="text-xs text-amber-700 font-bold mt-1">Ready for Pickup</div>
-                                                    <div className="text-[10px] text-amber-600">Reserved until {book.dueDate}</div>
+                                                    <div className="text-[10px] text-amber-600">Reserved until {formatDate(book.dueDate)}</div>
                                                 </div>
                                             </div>
                                         ))}

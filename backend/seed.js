@@ -28,7 +28,7 @@ const SEED_BOOKS = [
         isbn: '978-0743273565',
         status: 'AVAILABLE',
         location: JSON.stringify({ rack: 'R1', shelf: 'A', section: 'Fiction' }),
-        cover_url: 'https://placehold.co/150x200?text=Gatsby'
+        cover_url: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400'
     },
     {
         id: 'B002',
@@ -40,7 +40,7 @@ const SEED_BOOKS = [
         location: JSON.stringify({ rack: 'R3', shelf: 'D', section: 'CompSci' }),
         issued_to_id: 'M001',
         due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        cover_url: 'https://placehold.co/150x200?text=Clean+Code'
+        cover_url: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?auto=format&fit=crop&q=80&w=400'
     },
     {
         id: 'B003',
@@ -50,7 +50,27 @@ const SEED_BOOKS = [
         isbn: '978-0198099307',
         status: 'AVAILABLE',
         location: JSON.stringify({ rack: 'R3', shelf: 'E', section: 'CompSci' }),
-        cover_url: 'https://placehold.co/150x200?text=DS+in+C'
+        cover_url: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?auto=format&fit=crop&q=80&w=400'
+    },
+    {
+        id: 'B004',
+        title: 'Atomic Habits',
+        author: 'James Clear',
+        category: 'Self-Help',
+        isbn: '978-0735211292',
+        status: 'AVAILABLE',
+        location: JSON.stringify({ rack: 'R2', shelf: 'A', section: 'Growth' }),
+        cover_url: 'https://images.unsplash.com/photo-1541963463532-d68292c34b19?auto=format&fit=crop&q=80&w=400'
+    },
+    {
+        id: 'B005',
+        title: 'The Psychology of Money',
+        author: 'Morgan Housel',
+        category: 'Finance',
+        isbn: '978-0857197689',
+        status: 'AVAILABLE',
+        location: JSON.stringify({ rack: 'R1', shelf: 'B', section: 'Business' }),
+        cover_url: 'https://images.unsplash.com/photo-1592492159418-39f319320569?auto=format&fit=crop&q=80&w=400'
     }
 ];
 
@@ -79,7 +99,7 @@ const seedDB = async () => {
             );
         `);
         console.log('✅ Users table ensured.');
- 
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS books (
                 id VARCHAR(50) PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
@@ -93,7 +113,7 @@ const seedDB = async () => {
                 due_date TIMESTAMP,
                 waitlist JSONB DEFAULT '[]'::JSONB
             );
- 
+
             CREATE TABLE IF NOT EXISTS racks (
                 id VARCHAR(50) PRIMARY KEY,
                 url TEXT NOT NULL,
@@ -107,6 +127,7 @@ const seedDB = async () => {
         await pool.query(`
             INSERT INTO users (id, name, email, password, role, status, photo_url, fines_owed)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (id) DO NOTHING
         `, ['U001', 'Admin User', 'admin@library.com', adminPass, 'ADMIN', 'ACTIVE', 'https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff', 0]);
 
         // 4. Insert Member
@@ -115,11 +136,12 @@ const seedDB = async () => {
         await pool.query(`
             INSERT INTO users (id, name, email, password, role, status, photo_url, aadhaar, fines_owed)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (id) DO NOTHING
         `, ['M001', 'Vimal Kumar', 'vimal@example.com', memPass, 'MEMBER', 'ACTIVE', 'https://ui-avatars.com/api/?name=Vimal+Kumar&background=random', '123456789012', 0]);
 
         // 5. Insert Racks
         for (let rack of SEED_RACK_PHOTOS) {
-            await pool.query('INSERT INTO racks (id, url, pins) VALUES ($1, $2, $3)', [rack.id, rack.url, rack.pins]);
+            await pool.query('INSERT INTO racks (id, url, pins) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING', [rack.id, rack.url, rack.pins]);
         }
 
         // 6. Insert Books
@@ -127,6 +149,7 @@ const seedDB = async () => {
             await pool.query(`
                 INSERT INTO books (id, title, author, isbn, category, status, location, issued_to_id, due_date, cover_url)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                ON CONFLICT (id) DO NOTHING
             `, [book.id, book.title, book.author, book.isbn, book.category, book.status, book.location, book.issued_to_id || null, book.due_date || null, book.cover_url]);
         }
 
