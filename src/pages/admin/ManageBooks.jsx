@@ -131,7 +131,7 @@ const ManageBooks = () => {
                 <div>
                     <h1 className="text-2xl font-black text-gray-800 tracking-tight">Library Assets</h1>
                     <p className="text-gray-400 text-sm">Managing {books.length} real-time books in MongoDB.</p>
-                    <p className="text-[8px] text-indigo-400 font-bold uppercase tracking-widest mt-1">System Build: May 5 - 21:30</p>
+                    <p className="text-[8px] text-indigo-400 font-bold uppercase tracking-widest mt-1">System Build: May 5 - 22:45 (SYNC FIX)</p>
                 </div>
                 <div className="flex gap-4 w-full md:w-auto">
                     <div className="relative flex-1 md:w-64">
