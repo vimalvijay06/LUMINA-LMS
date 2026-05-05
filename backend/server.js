@@ -12,8 +12,18 @@ const statsRoutes = require('./routes/stats');
 const aiRoutes = require('./routes/ai');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+
+// Request Tracker (to see if Vercel is reaching us)
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
  
 // Root Route
 app.get('/', (req, res) => res.send('🚀 Lumina Library Backend is Running!'));
