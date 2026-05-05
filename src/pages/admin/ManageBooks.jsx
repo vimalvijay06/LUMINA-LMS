@@ -148,10 +148,15 @@ const ManageBooks = () => {
                     <div key={book.id} className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden">
                         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-50">
                             <img src={book.coverUrl || 'https://placehold.co/300x400?text=No+Cover'} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                            <div className="absolute top-3 right-3 flex flex-col gap-2">
+                            <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
                                 <button onClick={(e) => { e.stopPropagation(); setInspectingBook(book); }} className="p-2 bg-white/90 backdrop-blur shadow-lg rounded-full text-blue-600 hover:bg-blue-600 hover:text-white transition-all" title="Inspect Book"><Search size={16} /></button>
                                 <button onClick={(e) => { e.stopPropagation(); handleOpenModal(book); }} className="p-2 bg-white/90 backdrop-blur shadow-lg rounded-full text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all" title="Edit Book"><Edit size={16} /></button>
                                 <button onClick={(e) => { e.stopPropagation(); handleDelete(book); }} className="p-2 bg-white/90 backdrop-blur shadow-lg rounded-full text-red-500 hover:bg-red-500 hover:text-white transition-all" title="Delete Book"><Trash2 size={16} /></button>
+                            </div>
+                            <div className="absolute top-3 left-3 z-10">
+                                <span className="bg-black/80 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 rounded-lg border border-white/20 shadow-xl">
+                                    ID: {book.id}
+                                </span>
                             </div>
                             <div className="absolute bottom-3 left-3 right-3 bg-black/60 backdrop-blur-md p-3 rounded-xl border border-white/10">
                                 <div className="flex justify-between items-center mb-1">
